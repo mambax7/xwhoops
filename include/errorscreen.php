@@ -56,11 +56,28 @@ function xoops_module_install_xwhoops(\XoopsModule $module): bool
         return true;
     }
 
-    $held = \htmlspecialchars(xoops_getRecordedErrorScreenOwner(), \ENT_QUOTES);
+    // A refused claim has two distinct causes, and they need different advice. A
+    // non-empty recorded owner means the seat is genuinely taken; an EMPTY one means the
+    // WRITE failed -- xoops_data/data unwritable, most likely -- and telling the admin
+    // that '' already owns the screen would send them to the wrong problem.
+    $held = \function_exists('xoops_getRecordedErrorScreenOwner')
+        ? (string) xoops_getRecordedErrorScreenOwner()
+        : '';
+
+    if ('' === $held) {
+        $module->setMessage(
+            'WARNING: could not record the error-screen owner. Check that xoops_data/data '
+            . 'is writable, then update this module to claim the screen.'
+        );
+
+        return true;
+    }
+
+    $heldSafe = \htmlspecialchars($held, \ENT_QUOTES);
     $module->setMessage(
-        "WARNING: '" . $held . "' already claims the error screen, and installing this "
-        . 'module has not changed that. To hand the screen over: deactivate ' . $held
-        . ' and update this module, or uninstall ' . $held . ' and reinstall this module, '
+        "WARNING: '" . $heldSafe . "' already claims the error screen, and installing this "
+        . 'module has not changed that. To hand the screen over: deactivate ' . $heldSafe
+        . ' and update this module, or uninstall ' . $heldSafe . ' and reinstall this module, '
         . "or pin it with 'error_screen' => '" . \htmlspecialchars($dirname, \ENT_QUOTES)
         . "' in xoops_data/data/debug.php."
     );
@@ -87,13 +104,22 @@ function xoops_module_update_xwhoops(\XoopsModule $module): bool
     }
 
     $dirname = (string) $module->getVar('dirname', 'n');
-    $held = xoops_getRecordedErrorScreenOwner();
+    $held = \function_exists('xoops_getRecordedErrorScreenOwner')
+        ? (string) xoops_getRecordedErrorScreenOwner()
+        : '';
 
     if ('' === $held || $held === $dirname) {
         // Free, or already ours. Recording again is also how a module gets the seat back
-        // after the previous holder was uninstalled.
-        xoops_recordErrorScreenOwner($dirname);
-        $module->setMessage('This module owns the error screen.');
+        // after the previous holder was uninstalled. The result is checked: an ignored
+        // false here reported "owns the error screen" over a write that never happened.
+        if (xoops_recordErrorScreenOwner($dirname)) {
+            $module->setMessage('This module owns the error screen.');
+        } else {
+            $module->setMessage(
+                'WARNING: could not record the error-screen owner. Check that '
+                . 'xoops_data/data is writable and update this module again.'
+            );
+        }
 
         return true;
     }

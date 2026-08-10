@@ -164,7 +164,7 @@ class XwhoopsCorePreload extends \XoopsPreloadItem
 
         $permissionHelper = new Permission(self::OWNER);
 
-        return (bool) $permissionHelper->checkPermission(self::PERMISSION_NAME, self::PERMISSION_ITEM_ID, false);
+        return $permissionHelper->checkPermission(self::PERMISSION_NAME, self::PERMISSION_ITEM_ID, false);
     }
 
     /**
@@ -258,6 +258,9 @@ class XwhoopsCorePreload extends \XoopsPreloadItem
 
             public function restoreErrorHandler(): void
             {
+                // Intentionally empty: Whoops never held the error handler (see
+                // setErrorHandler above), so there is nothing for it to restore -- and a
+                // real restore here would pop a frame belonging to somebody else.
             }
         };
 
@@ -300,7 +303,7 @@ class XwhoopsCorePreload extends \XoopsPreloadItem
     {
         $error = (null === $query['errno'] ? '' : $query['errno'] . ' ') . ($query['error'] ?? '');
         $queryTime = isset($query['query_time']) ? \sprintf('%0.6f', $query['query_time']) : '';
-        $queryKey = $count . ' - ' . ($queryTime ?: 'No Time');
+        $queryKey = $count . ' - ' . ('' !== $queryTime ? $queryTime : 'No Time');
 
         if (null !== $query['errno']) {
             $queryKey = $count . ' - Error';

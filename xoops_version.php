@@ -9,6 +9,8 @@
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+$modversion = [];
+
 $modversion['version']       = '2.0.0-Beta2';
 $modversion['module_status'] = 'Beta2';
 $modversion['status']        = 'Beta2';

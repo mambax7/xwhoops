@@ -32,6 +32,7 @@ parameters:
         - .build (?)
         - node_modules (?)
         - tests/bootstrap.php (?)
+        - tests/Unit/fixtures (?)
         - rector.php (?)
         - .php-cs-fixer.dist.php (?)
 

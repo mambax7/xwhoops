@@ -57,4 +57,8 @@ return RectorConfig::configure()
         __DIR__ . '/templates',
         // Smarty-compiled or generated files, if any.
         '*/templates_c/*',
+        // Test doubles that shadow core classes (e.g. Xmf\Module\Helper\Permission).
+        // Rector must neither rewrite them nor use them to infer the type of production
+        // code -- a fixture's signature is not a fact about the real class.
+        __DIR__ . '/tests/Unit/fixtures',
     ]);

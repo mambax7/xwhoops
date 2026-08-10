@@ -37,10 +37,9 @@ final class ErrorScreenContractTest extends TestCase
         $this->reports = [];
 
         // XoopsPreloadItem is a core class; the module's own file only needs it to exist
-        // as a parent. Declaring a stand-in keeps this a unit test.
-        if (! class_exists('\XoopsPreloadItem', false)) {
-            eval('class XoopsPreloadItem {}');
-        }
+        // as a parent. A fixture file provides the stand-in -- no eval(), which a scanner
+        // flags and a fixture never needs.
+        require_once __DIR__ . '/fixtures/XoopsPreloadItem.php';
 
         require_once \dirname(__DIR__, 2) . '/preloads/core.php';
 
@@ -50,6 +49,9 @@ final class ErrorScreenContractTest extends TestCase
 
     protected function tearDown(): void
     {
+        // The permission verdict a case may have set must not leak to the next one.
+        unset($GLOBALS['__xwhoops_test_permission_granted']);
+
         // POP back to where this case started; do not PUSH the old handler on top.
         //
         // set_error_handler() adds a frame, restore_error_handler() removes one. An
@@ -193,6 +195,57 @@ final class ErrorScreenContractTest extends TestCase
         ]);
 
         self::assertFalse($this->handlersMoved(), 'no reporting channel must mean no registration');
+    }
+
+    #[Test]
+    public function itRegistersWhoopsAndLeavesTheErrorHandlerWithCore(): void
+    {
+        // The success path, and the one that matters most: it is where the SystemFacade
+        // subclass earns its place. Whoops' register() takes all three handlers by
+        // default; this module refuses the error handler at the facade so XoopsLogger and
+        // DebugBar keep it, and takes only the exception and shutdown handlers.
+        require_once __DIR__ . '/fixtures/Permission.php';
+        $GLOBALS['__xwhoops_test_permission_granted'] = true;
+
+        \XwhoopsCorePreload::eventCoreDebugErrorscreen($this->event());
+
+        self::assertSame('active', $this->reports[0][0] ?? '', 'a granted developer request must activate');
+
+        // The error handler is UNCHANGED -- the facade never let Whoops have it.
+        self::assertSame(
+            $this->errorHandlerBefore,
+            $this->currentErrorHandler(),
+            'Whoops must not take the error handler; XoopsLogger keeps it'
+        );
+
+        // The exception handler is Whoops': register() sets [$run, 'handleException'].
+        $exceptionHandler = $this->currentExceptionHandler();
+        self::assertIsArray($exceptionHandler, 'the exception handler must be the Whoops Run callable');
+        self::assertInstanceOf(\Whoops\Run::class, $exceptionHandler[0]);
+
+        // Tear it down the way Whoops itself does at destruction, and confirm the pairing
+        // balances: unregister() restores BOTH handlers through the facade, so the error
+        // handler (a facade no-op) is untouched and the exception handler returns to
+        // baseline. This is the regression test for the round where restore_error_handler()
+        // after register() left the stack one frame short when Whoops tidied up.
+        $exceptionHandler[0]->unregister();
+
+        self::assertSame($this->errorHandlerBefore, $this->currentErrorHandler());
+        self::assertSame($this->exceptionHandlerBefore, $this->currentExceptionHandler());
+    }
+
+    #[Test]
+    public function itStaysDormantWhenThePermissionIsNotGranted(): void
+    {
+        // The developer gate and the module permission answer different questions; a site
+        // can withhold Whoops from an administrator who would otherwise qualify.
+        require_once __DIR__ . '/fixtures/Permission.php';
+        $GLOBALS['__xwhoops_test_permission_granted'] = false;
+
+        \XwhoopsCorePreload::eventCoreDebugErrorscreen($this->event());
+
+        self::assertSame('disabled', $this->reports[0][0] ?? '');
+        self::assertFalse($this->handlersMoved(), 'a withheld permission must register nothing');
     }
 
     #[Test]

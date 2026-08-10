@@ -130,7 +130,9 @@ Note: if the XoopsLogger is enabled, MySQL queries will be shown in the Environm
 The site tells you why. `XOOPS_ERROR_SCREEN_STATUS` and `_MESSAGE` are published on every
 request: `active`, `dormant` (no enabled `debug.php`), `disabled` (the module ran and chose
 not to register — the message says why), `missing` (`composer install` has not been run),
-`unclaimed` (the configured owner is not an active module), or `core`.
+`error` (the provider failed to start, and core handed the handlers back to XoopsLogger),
+`unclaimed` (the configured owner is not an active module), `contested` (more than one module
+answered one token, so the handlers went back to XoopsLogger), or `core`.
 
 ## Alongside xTracy
 
