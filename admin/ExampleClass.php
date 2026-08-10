@@ -2,6 +2,16 @@
 
 defined('XOOPS_ROOT_PATH') || exit('XOOPS root path not defined');
 
+/**
+ * Raised by {@see ExampleClass::flawedMethod()} to put a real xWhoops screen on the page.
+ *
+ * A dedicated type rather than a bare RuntimeException so the throw reads as the deliberate
+ * demonstration it is -- and so static analysis stops flagging a generic exception here.
+ */
+class XwhoopsExampleException extends \RuntimeException
+{
+}
+
 class ExampleClass
 {
     public function __construct(private readonly string $msg)
@@ -27,7 +37,7 @@ class ExampleClass
             /** @phpstan-ignore class.notFound */
             new \NoSuchClass($this->msg);
         } catch (Throwable $e) {
-            throw new RuntimeException('Example Exception, follow how we got here.', 100, $e);
+            throw new XwhoopsExampleException('Example Exception, follow how we got here.', 100, $e);
         }
     }
 }

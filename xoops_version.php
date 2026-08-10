@@ -34,9 +34,10 @@ $modversion['hasMain']       = false;
 // core.debug.errorscreen is only half of being a provider: core offers the seat to one
 // declared owner, and a module that never claims it is never offered it. No-ops on a
 // core without the seam.
-$modversion['onInstall']   = 'include/errorscreen.php';
-$modversion['onUpdate']    = 'include/errorscreen.php';
-$modversion['onUninstall'] = 'include/errorscreen.php';
+$errorScreenCallbacks      = 'include/errorscreen.php';
+$modversion['onInstall']   = $errorScreenCallbacks;
+$modversion['onUpdate']    = $errorScreenCallbacks;
+$modversion['onUninstall'] = $errorScreenCallbacks;
 
 // Admin things
 $modversion['hasAdmin']    = true;
