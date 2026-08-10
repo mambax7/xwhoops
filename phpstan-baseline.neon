@@ -49,6 +49,12 @@ parameters:
 			path: admin/menu.php
 
 		-
+			message: '#^Constant _MI_XWHOOPS_EXAMPLE not found\.$#'
+			identifier: constant.notFound
+			count: 1
+			path: admin/menu.php
+
+		-
 			message: '#^Constant _MI_XWHOOPS_HOME not found\.$#'
 			identifier: constant.notFound
 			count: 1

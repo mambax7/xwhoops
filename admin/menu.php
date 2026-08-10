@@ -46,6 +46,12 @@ $adminmenu[] = [
     'link' => 'admin/permissions.php',
     'icon' => $pathIcon32 . 'permissions.png',
 ];
+// Test
+$adminmenu[] = [
+    'title' => _MI_XWHOOPS_EXAMPLE,
+    'link' => 'admin/index.php?do=example',
+    'icon' => $pathIcon32 . 'exec.png',
+];
 // About
 $adminmenu[] = [
     'title' => _MI_XWHOOPS_ABOUT,

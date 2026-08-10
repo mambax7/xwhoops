@@ -4,7 +4,7 @@
     <h4 class="odd">DESCRIPTION</h4> <br>
 
     <p>
-        xWhoops provides extended error messages for XOOPS using <a href="https://github.com/filp/whoops" class="external">whoops</a>.
+        xWhoops provides extended error messages for XOOPS using <a href="https://github.com/filp/whoops" class="external" target="_blank">Whoops</a>.
         It is primarily intended for developers.<br> <br>
     </p>
     <p>
@@ -22,8 +22,7 @@
         <li>download the distribution archive of your choice</li>
         <li>extract the archive into your system's modules directory</li>
         <li>rename the new directory to xwhoops</li>
-        <li>open a terminal into that directory and execute<br>
-            <code>  composer install</code>
+        <li>open a terminal into that directory and execute  <code>  composer install</code>
         </li>
         <li>install the xwhoops module in the system administration module page</li>
         <li>grant access by selecting groups in the permissions section</li>
@@ -32,9 +31,57 @@
 
     <br> <br>
         Detailed instructions on installing modules are available in the
-        <a href="https://xoops.gitbook.io/xoops-operations-guide/" target="_blank">Chapter 2.12 of our XOOPS Operations Manual</a
+        <a href="https://xoops.gitbook.io/xoops-operations-guide/" target="_blank">Chapter 2.12 of our XOOPS Operations Manual</a>
     </p>
     <br> <br>
+
+    <h4 class="odd">SWITCHING IT ON</h4> <br>
+    <p class="even">
+    <p>
+        On XOOPS <strong>2.7.2 and earlier</strong>, installing the module and granting the
+        permission is the whole setup: xWhoops registers itself during the boot whenever
+        XOOPS debug is on and an authenticated site administrator is looking.
+    </p>
+    <p>
+        On XOOPS <strong>2.7.3 and later</strong> this changed, and for a good reason. PHP
+        has exactly one error handler and one exception handler, and whoever registers last
+        owns them — so before 2.7.3, which error screen you ended up with was decided by
+        module weight and id, and reinstalling something unrelated could silently change it
+        with nothing anywhere reporting the fact. 2.7.3 lets a site declare an owner, and
+        offers the handlers to that one module at the end of the boot.
+    </p>
+    <p>
+        What that means in practice:
+    </p>
+    <ul>
+        <li><strong>Installing the module claims the error screen</strong>, if no other
+            provider holds it. XOOPS ships <code>'error_screen' =&gt; 'auto'</code>, meaning
+            "the first error-screen module installed", so normally nothing else is needed.</li>
+        <li><strong>Only <code>xoops_data/data/debug.php</code> activates it.</strong>
+            Admin &rarr; Preferences &rarr; Debug Mode does not, deliberately: writing a
+            file on the server is a stronger credential than holding an admin session, and
+            an error screen shows source, paths and request data. Copy
+            <code>debug.dist.php</code> beside it and set <code>'enabled' =&gt; true</code>.
+            With the module installed but no <code>debug.php</code>, XOOPS reports the
+            status <code>dormant</code> and says so.</li>
+        <li><strong>Only one module can own it.</strong> If xTracy is also installed,
+            whichever was installed first keeps it. To hand it over: deactivate the holder
+            and update this module, or uninstall the holder and reinstall this one, or name
+            your choice with <code>'error_screen' =&gt; 'xwhoops'</code> in
+            <code>debug.php</code>, which beats anything recorded.</li>
+        <li><strong>Deactivating does not pass the screen to another module.</strong> The
+            site falls back to core error handling and reports <code>unclaimed</code>.
+            Ownership only ever changes when somebody asks for it.</li>
+    </ul>
+    <p>
+        If something is not appearing, the site tells you why: XOOPS publishes
+        <code>XOOPS_ERROR_SCREEN_OWNER</code>, <code>_SOURCE</code>, <code>_STATUS</code>
+        and <code>_MESSAGE</code> on every request, with values such as <code>active</code>,
+        <code>dormant</code>, <code>disabled</code> (the module ran and chose not to
+        register — the message says which reason), <code>missing</code> (run
+        <code>composer install</code> inside the module) or <code>unclaimed</code>.
+    </p>
+    </p>
 
     <h4 class="odd">OPERATING INSTRUCTIONS</h4><br>
     <p class="even">
@@ -48,7 +95,12 @@
         <li><em>top right</em> shows the code for the currently selected stack frame item. Select a new stack frame to see the related code.</li>
         <li><em>lower right</em> shows environment information such as request parameters, session information, etc.</li>
     </ul>
-    Note: if the XoopsLogger is enabled, MySQL queries will be shown in the Environment & details section.
+    Note: if the XoopsLogger is enabled, MySQL queries will be shown in the Environment &amp; details section.
+    </p>
+    <p>
+        xWhoops takes the exception and shutdown handlers only, and hands the error handler
+        straight back, so notices, warnings and deprecations still reach XoopsLogger and the
+        DebugBar module.
     </p>
         Detailed instructions on configuring the access rights for user groups are available in the
         <a href="https://xoops.gitbook.io/xoops-operations-guide/" target="_blank">Chapter 2.8 of our XOOPS Operations Manual</a><br> <br></p>

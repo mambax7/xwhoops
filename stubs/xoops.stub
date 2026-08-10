@@ -161,6 +161,16 @@ namespace {
         public function dirname(): string {}
 
         public static function getByDirname(string $dirname): ?XoopsModule {}
+
+        public function isactive(): int {}
+
+        /** Queues a message shown on the module install/update/uninstall report page. */
+        public function setMessage(string $str): void {}
+    }
+
+    class XoopsModuleHandler extends XoopsPersistableObjectHandler
+    {
+        public function getByDirname(string $dirname): ?XoopsModule {}
     }
 
     class XoopsUser extends XoopsObject
@@ -176,6 +186,44 @@ namespace {
     class XoopsPreloadItem
     {
         public function __construct() {}
+    }
+
+    // ---------------------------------------------------------------- global functions
+
+    function xoops_getHandler(string $name, bool $optional = false): mixed {}
+
+    function redirect_header(string $url, int $time = 3, string $message = '', bool $addredirect = true, bool $allowExternalLink = false): void {}
+
+    // The XOOPS 2.7.3 error-screen ownership API, published by include/debugconfig.php.
+    //
+    // Listed here because analysis has no booted core to discover them in, NOT because
+    // they are optional: the module still guards every call with function_exists() so it
+    // runs unchanged on 2.7.2, and the stub must not be read as permission to drop that.
+
+    function xoops_recordErrorScreenOwner(string $dirname, bool $force = false): bool {}
+
+    function xoops_getRecordedErrorScreenOwner(): string {}
+
+    function xoops_releaseErrorScreenOwner(string $dirname): bool {}
+}
+
+namespace Xmf {
+    class Request
+    {
+        public static function getString(string $name, string $default = '', string $hash = 'default', int $mask = 0): string {}
+
+        public static function getInt(string $name, int $default = 0, string $hash = 'default', int $mask = 0): int {}
+
+        public static function getBool(string $name, bool $default = false, string $hash = 'default'): bool {}
+
+        /** @return array<mixed> */
+        public static function getArray(string $name, array $default = [], string $hash = 'default', int $mask = 0): array {}
+
+        public static function getCmd(string $name, string $default = '', string $hash = 'default', int $mask = 0): string {}
+
+        public static function getMethod(): string {}
+
+        public static function getVar(string $name, mixed $default = null, string $hash = 'default', string $type = 'none', int $mask = 0): mixed {}
     }
 }
 

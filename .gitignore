@@ -67,9 +67,9 @@ package-lock.json
 
 # --- Local overrides of committed *.dist configs ---
 /.php-cs-fixer.php
-phpstan.neon
-phpunit.xml
-psalm.xml
+/phpstan.neon
+/phpunit.xml
+/psalm.xml
 
 # --- Environment, logs & secrets ---
 .env

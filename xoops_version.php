@@ -9,10 +9,12 @@
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-$modversion['version']       = '2.0.0-Beta1';
-$modversion['module_status'] = 'Beta1';
-$modversion['status']        = 'Beta1';
-$modversion['release_date']  = '2026/07/02';
+$modversion = [];
+
+$modversion['version']       = '2.0.0-Beta2';
+$modversion['module_status'] = 'Beta2';
+$modversion['status']        = 'Beta2';
+$modversion['release_date']  = '2026/08/08';
 $modversion['name']          = _MI_XWHOOPS_NAME;
 $modversion['description']   = _MI_XWHOOPS_DESCRIPTION;
 $modversion['author']        = 'Richard Griffith';
@@ -23,12 +25,19 @@ $modversion['website']       = 'https://github.com/XoopsModules27x/xwhoops';
 $modversion['license']       = 'GNU GPL 2 or later';
 $modversion['license_url']   = 'https://www.gnu.org/licenses/gpl-2.0.html';
 $modversion['official']      = 0;
-$modversion['image']         = 'icons/logo.png';
+$modversion['image']         = 'assets/images/logoModule.png';
 $modversion['min_xoops']     = '2.7.0';
 $modversion['min_php']       = '8.2.0';
 $modversion['hasMain']       = false;
 
-//$modversion['onInstall'] = "include/onInstall.php";
+// Error-screen ownership for the XOOPS 2.7.3 provider seam. Answering
+// core.debug.errorscreen is only half of being a provider: core offers the seat to one
+// declared owner, and a module that never claims it is never offered it. No-ops on a
+// core without the seam.
+$errorScreenCallbacks      = 'include/errorscreen.php';
+$modversion['onInstall']   = $errorScreenCallbacks;
+$modversion['onUpdate']    = $errorScreenCallbacks;
+$modversion['onUninstall'] = $errorScreenCallbacks;
 
 // Admin things
 $modversion['hasAdmin']    = true;

@@ -1,0 +1,183 @@
+<?php declare(strict_types=1);
+
+/*
+ You may not change or alter any portion of this comment or credits
+ of supporting developers from this source code or any supporting source code
+ which is considered copyrighted (c) material of the original comment or credit authors.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ */
+
+/**
+ * Error-screen ownership hooks for the XOOPS 2.7.3 provider seam.
+ *
+ * Answering core.debug.errorscreen is only half of being a provider. Core offers the seat
+ * to ONE declared owner, and a module that never claims it is never offered it -- it sits
+ * installed, correct, and silent. These hooks are the claiming half.
+ *
+ * On a core without the seam every function here is a no-op, so the module installs and
+ * behaves exactly as it always has.
+ *
+ * @copyright 2000-2026 XOOPS Project (https://xoops.org)
+ * @license   GNU GPL 2.0 or later (https://www.gnu.org/licenses/gpl-2.0.html)
+ */
+
+defined('XOOPS_ROOT_PATH') || exit('Restricted access');
+
+/**
+ * Claim the error screen, unless another provider already holds it.
+ *
+ * First installed wins, and core enforces that against an ORDINARY claim -- this cannot
+ * take a seat another module is sitting in by asking normally. A deliberate handover uses
+ * core's $force, which the update hook below does after establishing the holder has
+ * stopped; module code is trusted code, so the guard stops an accident rather than an
+ * attacker. When the seat IS taken the installation still succeeds:
+ * refusing would mean you could not keep two providers installed and switch between them.
+ *
+ * @return bool true — installation succeeds either way
+ */
+function xoops_module_install_xwhoops(\XoopsModule $module): bool
+{
+    if (! \function_exists('xoops_recordErrorScreenOwner')) {
+        return true;
+    }
+
+    $dirname = (string) $module->getVar('dirname', 'n');
+
+    if (xoops_recordErrorScreenOwner($dirname)) {
+        $module->setMessage(
+            'This module now owns the error screen. It takes effect once '
+            . 'xoops_data/data/debug.php exists and is enabled — Admin → Preferences → '
+            . 'Debug Mode alone does not activate it.'
+        );
+
+        return true;
+    }
+
+    // A refused claim has two distinct causes, and they need different advice. A
+    // non-empty recorded owner means the seat is genuinely taken; an EMPTY one means the
+    // WRITE failed -- xoops_data/data unwritable, most likely -- and telling the admin
+    // that '' already owns the screen would send them to the wrong problem.
+    $held = \function_exists('xoops_getRecordedErrorScreenOwner')
+        ? xoops_getRecordedErrorScreenOwner()
+        : '';
+
+    if ('' === $held) {
+        $module->setMessage(
+            'WARNING: could not record the error-screen owner. Check that xoops_data/data '
+            . 'is writable, then update this module to claim the screen.'
+        );
+
+        return true;
+    }
+
+    $heldSafe = \htmlspecialchars($held, \ENT_QUOTES);
+    $module->setMessage(
+        "WARNING: '" . $heldSafe . "' already claims the error screen, and installing this "
+        . 'module has not changed that. To hand the screen over: deactivate ' . $heldSafe
+        . ' and update this module, or uninstall ' . $heldSafe . ' and reinstall this module, '
+        . "or pin it with 'error_screen' => '" . \htmlspecialchars($dirname, \ENT_QUOTES)
+        . "' in xoops_data/data/debug.php."
+    );
+
+    return true;
+}
+
+/**
+ * Take the error screen from a holder that is gone or inactive.
+ *
+ * The deliberate handover. Core refuses an ordinary claim while another token is recorded
+ * -- correctly, since an update must not quietly take a seat from a provider that is still
+ * running -- so the transfer needs someone to establish that the holder has stopped. That
+ * is a question about the module table, which core's bootstrap cannot answer and should
+ * not try to; it belongs here, where the module handler exists and an administrator is
+ * watching.
+ *
+ * @return bool true — the update itself succeeds either way
+ */
+function xoops_module_update_xwhoops(\XoopsModule $module): bool
+{
+    if (! \function_exists('xoops_recordErrorScreenOwner')) {
+        return true;
+    }
+
+    $dirname = (string) $module->getVar('dirname', 'n');
+    $held = \function_exists('xoops_getRecordedErrorScreenOwner')
+        ? xoops_getRecordedErrorScreenOwner()
+        : '';
+
+    if ('' === $held || $held === $dirname) {
+        // Free, or already ours. Recording again is also how a module gets the seat back
+        // after the previous holder was uninstalled. The result is checked: an ignored
+        // false here reported "owns the error screen" over a write that never happened.
+        if (xoops_recordErrorScreenOwner($dirname)) {
+            $module->setMessage('This module owns the error screen.');
+        } else {
+            $module->setMessage(
+                'WARNING: could not record the error-screen owner. Check that '
+                . 'xoops_data/data is writable and update this module again.'
+            );
+        }
+
+        return true;
+    }
+
+    $holder = null;
+    $handler = \function_exists('xoops_getHandler') ? xoops_getHandler('module') : null;
+    if (\is_object($handler) && \method_exists($handler, 'getByDirname')) {
+        $holder = $handler->getByDirname($held);
+    }
+
+    $holderIsRunning = \is_object($holder)
+        && \method_exists($holder, 'isactive')
+        && (bool) $holder->isactive();
+
+    if ($holderIsRunning) {
+        $safeHeld = \htmlspecialchars($held, \ENT_QUOTES);
+        $module->setMessage(
+            "The error screen still belongs to '" . $safeHeld . "', which is installed and "
+            . 'active, so this update has not taken it. Deactivate ' . $safeHeld
+            . ' and update this module again, or pin the owner in xoops_data/data/debug.php.'
+        );
+
+        return true;
+    }
+
+    if (xoops_recordErrorScreenOwner($dirname, true)) {
+        $module->setMessage(
+            "Took the error screen from '" . \htmlspecialchars($held, \ENT_QUOTES)
+            . "', which is no longer active."
+        );
+    } else {
+        $module->setMessage(
+            'WARNING: could not record the error-screen owner. Check that xoops_data/data '
+            . 'is writable and update this module again.'
+        );
+    }
+
+    return true;
+}
+
+/**
+ * Release the seat on the way out — but only if we hold it.
+ *
+ * Uninstalling is the deliberate act that frees the screen. DEACTIVATING is not: a site
+ * that switches this module off for an afternoon should find its setup intact when it
+ * switches back on.
+ *
+ */
+function xoops_module_uninstall_xwhoops(\XoopsModule $module): bool
+{
+    if (\function_exists('xoops_releaseErrorScreenOwner')
+        && ! xoops_releaseErrorScreenOwner((string) $module->getVar('dirname', 'n'))) {
+        $module->setMessage(
+            'WARNING: could not release the recorded error-screen owner. Check that '
+            . 'xoops_data/data is writable, then remove "error_screen_owner" from '
+            . 'xoops_data/data/debug-runtime.json by hand.'
+        );
+    }
+
+    return true;
+}
