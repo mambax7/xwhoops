@@ -1,0 +1,157 @@
+xWhoops — installation
+======================
+
+WHAT THIS IS, AND WHY YOU WOULD WANT IT
+
+  xWhoops brings Whoops error display to XOOPS.
+
+  An unhandled error normally gives you the least information of any failure and
+  the most guesswork.  xWhoops turns it into a screen that names the exception,
+  shows the stack frames that led there, the source for whichever frame you
+  click, and the state of the request that triggered it.
+
+  In practice that means:
+
+    - a call stack you can walk, frame by frame, with the code for each -- the
+      real mistake is often several frames above where the exception surfaced
+    - the request beside the error: parameters, session data, server state,
+      which is where most environment-specific bugs are visible
+    - your SQL too, if XoopsLogger is enabled
+
+  Your ordinary debug output survives.  xWhoops takes the exception and shutdown
+  handlers only and hands the error handler straight back, so notices, warnings
+  and deprecations still reach XoopsLogger and the DebugBar module.  You are not
+  trading one set of diagnostics for another.
+
+  It cannot leak to your visitors.  Whoops shows source, request data and
+  environment, so it appears only when debugging is on, the viewer is an
+  authenticated site administrator, and the use_xwhoops permission has been
+  granted to their group.
+
+  For developers and administrators diagnosing failures on a development or
+  controlled troubleshooting site.  Not for a live one.
+
+  A worked walkthrough -- install, switch on, break something, read the result --
+  is in docs/TUTORIAL.md.
+
+
+REQUIREMENTS
+
+  XOOPS 2.7.0 or later.  The ownership behaviour described under SWITCHING IT ON
+  applies from 2.7.3; on earlier versions the module registers during the boot
+  as it always has.
+
+  PHP 8.2 or later.
+
+  filp/whoops, which is NOT bundled in this repository.  Unlike xTracy, which
+  expects its library in xoops_lib, xWhoops vendors Whoops inside its own module
+  directory.  Whichever route you take below fetches it.
+
+
+1. INSTALL THE MODULE
+
+  Recommended -- Composer.  If your XOOPS 2.7 site is managed as a Composer
+  project (its root composer.json requires xoops/module-installer-plugin and
+  sets extra.xoops_modules), run from the site root:
+
+      composer require xoops/xwhoops
+
+  That stages the module and its filp/whoops dependency into
+  htdocs/modules/xwhoops.
+
+  Manual.  Download or clone this repository into htdocs/modules/ as xwhoops,
+  then fetch the library before installing it in XOOPS:
+
+      cd htdocs/modules/xwhoops
+      composer install
+
+  If you skip that step the module still installs and runs; it simply reports
+  that its autoloader is missing rather than failing obscurely later.
+
+  Then install the xWhoops module from Administration -> Modules.
+
+
+2. GRANT THE PERMISSION
+
+  Administration -> xWhoops -> Permissions, and select the groups allowed to see
+  Whoops.  Webmasters are the usual answer.  Nobody outside those groups will
+  see a Whoops screen, whatever else is configured.
+
+  This is the module's own permission, checked IN ADDITION to the site's
+  developer test.  The two answer different questions -- "may diagnostics be
+  exposed to whoever is making this request" and "has this site granted this
+  group xWhoops" -- so a site can withhold Whoops from an administrator who
+  would otherwise qualify.
+
+
+3. SWITCH DEBUGGING ON
+
+  XOOPS 2.7.2 and earlier:  enable Debug Mode in Admin -> Preferences.  That is
+  all; the module registers itself during the boot.
+
+  XOOPS 2.7.3 and later:  the error screen is activated by
+  xoops_data/data/debug.php instead.  If that file does not exist, copy the
+  template beside it:
+
+      cp xoops_data/data/debug.dist.php xoops_data/data/debug.php
+
+  and make sure of one line:
+
+      'enabled' => true,
+
+  Installing the module already claimed the error screen, so nothing else is
+  normally needed: 'error_screen' ships as 'auto', meaning "the first
+  error-screen module installed".
+
+  Admin -> Preferences -> Debug Mode no longer activates the error screen, and
+  this is deliberate: writing a file on the server is a stronger credential than
+  holding an admin session, and an error screen shows source code and request
+  data.  With the module installed but no debug.php, XOOPS reports the status
+  'dormant' and says why.
+
+
+VERIFYING
+
+  The module ships an example that throws on purpose.  As a member of a
+  permitted group, visit:
+
+      /modules/xwhoops/admin/index.php?do=example
+
+  You should get the Whoops screen.  If you get the ordinary XOOPS error page
+  instead, XOOPS 2.7.3+ publishes the reason on every request:
+
+      XOOPS_ERROR_SCREEN_OWNER     which module owns the screen, or 'core'
+      XOOPS_ERROR_SCREEN_SOURCE    config | recorded | default
+      XOOPS_ERROR_SCREEN_STATUS    what actually happened
+      XOOPS_ERROR_SCREEN_MESSAGE   a sentence explaining that status
+
+  docs/TUTORIAL.md has a table of every status and what to do about it.
+
+
+ONE OWNER AT A TIME (2.7.3+)
+
+  Both xWhoops and xTracy provide an error screen, and PHP has exactly one pair
+  of handlers, so exactly one can own it.  Whichever was installed first keeps
+  it; installing the second says so and changes nothing.
+
+  To hand it over: deactivate the holder and update the module you want, or
+  uninstall the holder and reinstall the one you want, or pin your choice with
+  'error_screen' => 'xwhoops' in debug.php.  Deactivating the owner does not
+  pass the screen to another module -- the site falls back to core error
+  handling and reports 'unclaimed'.
+
+
+UNINSTALLING
+
+  Uninstall from Administration -> Modules.  On 2.7.3+ that releases the
+  recorded error-screen ownership.  Deactivating does NOT release it, so a
+  module switched off for an afternoon finds its setup intact when switched back
+  on.
+
+
+BEFORE GOING LIVE
+
+  On 2.7.3+, delete xoops_data/data/debug.php or set 'enabled' => false.  On
+  earlier versions, turn Debug Mode off.  Nothing here can reach an anonymous
+  visitor even if you forget, but a live site has no reason to carry a debug
+  configuration.

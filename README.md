@@ -10,15 +10,66 @@
 [![Latest Pre-Release](https://img.shields.io/github/tag/XoopsModules27x/xwhoops.svg?style=flat)](https://github.com/XoopsModules27x/xwhoops/tags/)
 [![Latest Version](https://img.shields.io/github/release/XoopsModules27x/xwhoops.svg?style=flat)](https://github.com/XoopsModules27x/xwhoops/releases/)
 
-A XOOPS 2.7.0+ module that brings **[whoops](https://github.com/filp/whoops)** error display to XOOPS. It is especially handy for diagnosing failures brought on by unhandled errors, so you can more properly handle them.
+---
 
-Administrators control access to the extended diagnostics, and any group can be granted or denied access.
+## What it is
 
-Whoops is intentionally disabled unless `XOOPS_DEBUG` is enabled and the current viewer is an authenticated site administrator with the xWhoops permission. **Do not enable this module's diagnostic output on a production site with debug disabled.**
+xWhoops brings **[Whoops](https://github.com/filp/whoops)** error display to XOOPS.
 
-Outside of the control panel, there is no user interface. It will "just work" when needed.
+When an unhandled error occurs, instead of a generic failure page you get a screen naming
+the exception, the stack frames that led to it, the source for whichever frame you click,
+and the state of the request that triggered it.
 
-The preload registers Whoops during XOOPS `eventCoreIncludeCommonAuthSuccess`, after the authenticated user is available for admin and permission checks.
+Outside of the control panel there is no user interface. It "just works" when needed.
+
+## What it does for you
+
+**Turns "something went wrong" into "this line went wrong."** Unhandled errors are the
+ones with the least information attached and the most guesswork involved. This is the
+module that gives them a stack trace, the surrounding code, and the request that caused
+them.
+
+**Lets you walk the call stack.** Click any frame and see its code. The failure is often
+several frames above where the exception surfaced, and clicking is faster than reading a
+trace and opening files by hand.
+
+**Shows the request beside the error.** Parameters, session data and server state sit in
+the same screen, which is where most environment-specific bugs are visible.
+
+**Shows your SQL.** With XoopsLogger enabled, the queries that ran appear in the
+Environment & details section.
+
+**Leaves your ordinary debug output intact.** xWhoops takes the exception and shutdown
+handlers only, and hands the error handler straight back — so notices, warnings and
+deprecations still reach XoopsLogger and the DebugBar module. You are not trading one set
+of diagnostics for another.
+
+**Cannot leak to your visitors.** Whoops exposes source code, request data and environment
+details, so it is disabled unless debugging is on *and* the viewer is an authenticated site
+administrator *and* the xWhoops permission has been granted. Administrators control which
+groups qualify.
+
+> **Do not enable this module's diagnostic output on a production site.**
+
+## How it works
+
+On XOOPS 2.7.3 and later, core publishes a rule for who owns PHP's error and exception
+handlers: a site declares an owner, and that one module registers at the very end of the
+boot — last, because whoever calls `set_error_handler()` last wins. This module answers for
+the token `xwhoops`, its own dirname.
+
+On 2.7.2 and earlier there is no such rule, and the module registers during
+`eventCoreIncludeCommonAuthSuccess`, once the authenticated user is available for the
+admin and permission checks. One file covers both; on the newer core the legacy path stands
+down so the module cannot register twice.
+
+---
+
+## Requirements
+
+- XOOPS 2.7.0 or later. Ownership behaviour described below applies from 2.7.3.
+- PHP 8.2 or later.
+- `filp/whoops`, which is **not** bundled in the repository.
 
 ## Installation
 
@@ -36,7 +87,7 @@ This stages the module, together with its `filp/whoops` dependency, into `htdocs
 
 - install the *xWhoops* module in the system administration module page
 - grant access by selecting groups in the permissions section
-- enable `XOOPS_DEBUG` only in a development or controlled troubleshooting environment
+- switch debugging on (see below)
 
 One-time site setup (the module-installer-plugin, `extra.xoops_modules`, and `allow-plugins`) is described in the [module-installer-plugin guide](https://github.com/XOOPS/module-installer-plugin/blob/master/docs/composer-module-distribution.md).
 
@@ -48,6 +99,22 @@ The module depends on `filp/whoops`, which is **not** bundled in the repository,
 - open a terminal in that directory and run `composer install`
 - install and configure the module as above
 
+## Switching it on
+
+**XOOPS 2.7.2 and earlier** — enable `XOOPS_DEBUG` in a development or controlled
+troubleshooting environment. That is all.
+
+**XOOPS 2.7.3 and later** — the error screen is activated by `xoops_data/data/debug.php`
+instead. Copy `debug.dist.php` beside it and set `'enabled' => true`. Installing the module
+already claimed the error screen, so nothing else is normally needed.
+
+> Admin → Preferences → Debug Mode no longer activates the error screen, deliberately:
+> writing a file on the server is a stronger credential than holding an admin session, and
+> an error screen shows source and request data. With the module installed but no
+> `debug.php`, XOOPS reports the status `dormant` rather than staying silent.
+
+`docs/TUTORIAL.md` walks through the whole thing with a worked example.
+
 ## The Whoops display
 
 The Whoops display contains 4 main sections.
@@ -57,6 +124,23 @@ The Whoops display contains 4 main sections.
 - *lower right* shows environment information such as request parameters, session information, etc.
 
 Note: if the XoopsLogger is enabled, MySQL queries will be shown in the Environment & details section.
+
+## When Whoops does not appear (2.7.3+)
+
+The site tells you why. `XOOPS_ERROR_SCREEN_STATUS` and `_MESSAGE` are published on every
+request: `active`, `dormant` (no enabled `debug.php`), `disabled` (the module ran and chose
+not to register — the message says why), `missing` (`composer install` has not been run),
+`unclaimed` (the configured owner is not an active module), or `core`.
+
+## Alongside xTracy
+
+Both provide an error screen and PHP has one pair of handlers, so exactly one can own it.
+Whichever was installed first keeps it. To hand it over: deactivate the holder and update
+the module you want, uninstall the holder and reinstall the one you want, or pin your
+choice with `'error_screen' => 'xwhoops'` in `debug.php`. Nothing is ever taken silently,
+and deactivating the owner does not pass the screen to another module.
+
+---
 
 ### Please visit us on https://xoops.org
 
