@@ -61,7 +61,7 @@ function xoops_module_install_xwhoops(\XoopsModule $module): bool
     // WRITE failed -- xoops_data/data unwritable, most likely -- and telling the admin
     // that '' already owns the screen would send them to the wrong problem.
     $held = \function_exists('xoops_getRecordedErrorScreenOwner')
-        ? (string) xoops_getRecordedErrorScreenOwner()
+        ? xoops_getRecordedErrorScreenOwner()
         : '';
 
     if ('' === $held) {
@@ -105,7 +105,7 @@ function xoops_module_update_xwhoops(\XoopsModule $module): bool
 
     $dirname = (string) $module->getVar('dirname', 'n');
     $held = \function_exists('xoops_getRecordedErrorScreenOwner')
-        ? (string) xoops_getRecordedErrorScreenOwner()
+        ? xoops_getRecordedErrorScreenOwner()
         : '';
 
     if ('' === $held || $held === $dirname) {
