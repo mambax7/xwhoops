@@ -15,6 +15,12 @@ use Xmf\Module\Helper\Permission;
 class XwhoopsCorePreload extends \XoopsPreloadItem
 {
     private const AUTOLOADER_PATH = '/vendor/autoload.php';
+
+    /**
+     * Kept in step with include/errorscreen.php, which seeds this permission at install.
+     * If you rename either, rename both — a mismatch is silent and looks exactly like an
+     * administrator having revoked the permission.
+     */
     private const PERMISSION_NAME = 'use_xwhoops';
     private const PERMISSION_ITEM_ID = 0;
 
@@ -68,8 +74,27 @@ class XwhoopsCorePreload extends \XoopsPreloadItem
             return;
         }
 
+        // The module's own permission, on top of the core gate. This is a genuine second
+        // question -- core answers "may diagnostics be exposed to whoever is making this
+        // request", this answers "has the site granted this user use_xwhoops" -- and a
+        // site may legitimately withhold Whoops from an administrator who qualifies.
+        //
+        // It only became a genuine question once the permission was SEEDED. Until
+        // 2.0.0-Beta3 nothing granted it: xoops_version.php declared none and no install
+        // hook created a row, so checkPermission() answered false on every fresh install
+        // and this module reported 'disabled' forever, naming a permission the
+        // administrator had never been told existed. It is seeded to the webmaster group
+        // at install now -- see xoops_module_install_xwhoops() in include/errorscreen.php.
+        //
+        // ORDER MATTERS, and it is not arbitrary. This check sits BEFORE
+        // initializeAutoloader(), so a refusal here means filp/whoops is never loaded and
+        // never registers with Composer\InstalledVersions. DebugBar's diagnostics page
+        // read that registry and reported "Whoops library: Not installed" on a site where
+        // it was installed and fine. DebugBar now checks the module vendor on disk before
+        // saying that, but the general lesson stands for anything that inspects us: a
+        // provider standing down is invisible except through the seam's own constants.
         if (! self::hasModulePermission()) {
-            $report('disabled', 'Whoops is dormant: the use_xwhoops permission is not granted to this user.');
+            $report('disabled', 'Whoops is dormant: the use_xwhoops permission is not granted to this user. Grant it at Admin → xWhoops → Permissions.');
 
             return;
         }
@@ -149,25 +174,6 @@ class XwhoopsCorePreload extends \XoopsPreloadItem
     }
 
     /**
-     * The module's own permission, checked separately from the developer gate.
-     *
-     * Core's gate answers "may diagnostics be exposed to whoever is making this request";
-     * this answers "has the site granted this user use_xwhoops". Both must hold, and they
-     * are different questions, so a site can withhold Whoops from an administrator who
-     * would otherwise qualify.
-     */
-    private static function hasModulePermission(): bool
-    {
-        if (! \class_exists(Permission::class)) {
-            return false;
-        }
-
-        $permissionHelper = new Permission(self::OWNER);
-
-        return $permissionHelper->checkPermission(self::PERMISSION_NAME, self::PERMISSION_ITEM_ID, false);
-    }
-
-    /**
      * Load the Whoops vendored autoloader. Returns true on success.
      *
      * The original implementation threw a RuntimeException here, which fatals
@@ -196,6 +202,30 @@ class XwhoopsCorePreload extends \XoopsPreloadItem
         require_once $autoloader;
 
         return true;
+    }
+
+    /**
+     * The module's own permission, checked separately from the developer gate.
+     *
+     * Core's gate answers "may diagnostics be exposed to whoever is making this request";
+     * this answers "has the site granted this user use_xwhoops". Both must hold, and they
+     * are different questions, so a site can withhold Whoops from an administrator who
+     * would otherwise qualify.
+     *
+     * Seeded to the webmaster group at install, so the default answer is yes and an
+     * administrator who wants it withheld goes and withholds it — rather than the module
+     * being silently inert until somebody guesses that a permission they were never shown
+     * is the reason.
+     */
+    private static function hasModulePermission(): bool
+    {
+        if (! \class_exists(Permission::class)) {
+            return false;
+        }
+
+        $permissionHelper = new Permission(self::OWNER);
+
+        return $permissionHelper->checkPermission(self::PERMISSION_NAME, self::PERMISSION_ITEM_ID, false);
     }
 
     private static function initializeWhoops(): void

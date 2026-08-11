@@ -27,6 +27,57 @@
 defined('XOOPS_ROOT_PATH') || exit('Restricted access');
 
 /**
+ * Grant use_xwhoops to the webmaster group, once, at install.
+ *
+ * The preload checks this permission before it will render, and until 2.0.0-Beta3 nothing
+ * ever created a row for it: xoops_version.php declares no permission block and there was
+ * no install hook. So checkPermission() answered false on every fresh install and the
+ * module reported 'disabled' for the lifetime of the site, naming a permission the
+ * administrator had never been shown. The permission is a real choice; the DEFAULT was
+ * the bug.
+ *
+ * Two properties this deliberately has:
+ *
+ *  - It seeds ONLY when no row exists for this permission on this module. An update must
+ *    never re-grant a permission an administrator has revoked, and a revoked permission is
+ *    stored as the ABSENCE of that group's row -- indistinguishable from "never granted"
+ *    except by whether any row exists at all. So the test is on the whole permission, not
+ *    on the webmaster row, and it is the difference between seeding a default and
+ *    overriding a decision.
+ *  - It is not fatal, and it does not fail the install. A site whose group table refuses
+ *    the insert still gets a working module and a message pointing at the permissions
+ *    page.
+ *
+ * @return bool true when a row was created
+ */
+function xwhoops_seedUsePermission(\XoopsModule $module): bool
+{
+    if (! \function_exists('xoops_getHandler') || ! \class_exists('CriteriaCompo')) {
+        return false;
+    }
+
+    $mid = (int) $module->getVar('mid');
+    if ($mid <= 0) {
+        return false;
+    }
+
+    $permHandler = xoops_getHandler('groupperm');
+    if (! \is_object($permHandler) || ! \method_exists($permHandler, 'addRight')) {
+        return false;
+    }
+
+    $criteria = new \CriteriaCompo(new \Criteria('gperm_modid', (string) $mid));
+    $criteria->add(new \Criteria('gperm_name', 'use_xwhoops'));
+    if ((int) $permHandler->getCount($criteria) > 0) {
+        return false;
+    }
+
+    $adminGroup = \defined('XOOPS_GROUP_ADMIN') ? (int) \constant('XOOPS_GROUP_ADMIN') : 1;
+
+    return (bool) $permHandler->addRight('use_xwhoops', 0, $adminGroup, $mid);
+}
+
+/**
  * Claim the error screen, unless another provider already holds it.
  *
  * First installed wins, and core enforces that against an ORDINARY claim -- this cannot
@@ -40,8 +91,27 @@ defined('XOOPS_ROOT_PATH') || exit('Restricted access');
  */
 function xoops_module_install_xwhoops(\XoopsModule $module): bool
 {
+    // BEFORE the seam guard below, not after. The permission gates the pre-seam
+    // registration path too, so a 2.7.0-2.7.2 install needs it just as much -- and that
+    // guard returns early.
+    $seeded = xwhoops_seedUsePermission($module);
+
     if (! \function_exists('xoops_recordErrorScreenOwner')) {
+        if (! $seeded) {
+            $module->setMessage(
+                'NOTE: could not grant the use_xwhoops permission automatically. '
+                . 'Grant it at Admin → xWhoops → Permissions, or Whoops will stay dormant.'
+            );
+        }
+
         return true;
+    }
+
+    if (! $seeded) {
+        $module->setMessage(
+            'NOTE: could not grant the use_xwhoops permission automatically. '
+            . 'Grant it at Admin → xWhoops → Permissions, or Whoops will stay dormant.'
+        );
     }
 
     $dirname = (string) $module->getVar('dirname', 'n');
@@ -99,6 +169,14 @@ function xoops_module_install_xwhoops(\XoopsModule $module): bool
  */
 function xoops_module_update_xwhoops(\XoopsModule $module): bool
 {
+    // The migration path for every site that installed a pre-Beta3 xwhoops and has been
+    // looking at 'disabled' ever since. Safe to run on every update: it creates a row only
+    // when the permission has NO rows at all, so an administrator who revoked it keeps
+    // their decision.
+    if (xwhoops_seedUsePermission($module)) {
+        $module->setMessage('Granted the use_xwhoops permission to the webmaster group.');
+    }
+
     if (! \function_exists('xoops_recordErrorScreenOwner')) {
         return true;
     }
