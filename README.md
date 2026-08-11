@@ -1,4 +1,4 @@
-![alt XOOPS CMS](https://xoops.org/images/logoXoopsPhp81.png)
+![alt XOOPS CMS](https://xoops.org/images/logo.png)
 
 ## xWhoops module for [XOOPS CMS 2.7.0+](https://xoops.org)
 
