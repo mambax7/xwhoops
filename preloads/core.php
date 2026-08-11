@@ -133,11 +133,20 @@ class XwhoopsCorePreload extends \XoopsPreloadItem
             return;
         }
 
+        // Permission BEFORE the autoloader, matching the seam path above. It used to be
+        // checked inside initializeWhoops(), after the autoloader had already run, so a
+        // user without the permission still loaded xwhoops's vendor tree and registered it
+        // with Composer's package registry -- work done on behalf of a request that was
+        // about to be refused, and a side effect visible to anything reading that registry.
+        if (! self::hasModulePermission()) {
+            return;
+        }
+
         // Skip Whoops registration cleanly if the autoloader is missing.
         if (! self::initializeAutoloader()) {
             return;
         }
-        self::initializeWhoops();
+        self::registerWhoops();
     }
 
     /**
@@ -226,13 +235,6 @@ class XwhoopsCorePreload extends \XoopsPreloadItem
         $permissionHelper = new Permission(self::OWNER);
 
         return $permissionHelper->checkPermission(self::PERMISSION_NAME, self::PERMISSION_ITEM_ID, false);
-    }
-
-    private static function initializeWhoops(): void
-    {
-        if (self::hasModulePermission()) {
-            self::registerWhoops();
-        }
     }
 
     private static function registerWhoops(): void

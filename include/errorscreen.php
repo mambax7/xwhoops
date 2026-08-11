@@ -48,33 +48,44 @@ defined('XOOPS_ROOT_PATH') || exit('Restricted access');
  *    the insert still gets a working module and a message pointing at the permissions
  *    page.
  *
- * @return bool true when a row was created
+ * THREE outcomes, not two. 'exists' and 'failed' are both "no row was created", and a
+ * boolean collapses them -- which made a reinstall over a retained permission row warn
+ * that the grant had failed when it had simply already been done. The caller must be able
+ * to tell "nothing to do" from "something went wrong".
+ *
+ * @return string 'created' | 'exists' | 'failed'
  */
-function xwhoops_seedUsePermission(\XoopsModule $module): bool
+function xwhoops_seedUsePermission(\XoopsModule $module): string
 {
     if (! \function_exists('xoops_getHandler') || ! \class_exists('CriteriaCompo')) {
-        return false;
+        return 'failed';
     }
 
     $mid = (int) $module->getVar('mid');
     if ($mid <= 0) {
-        return false;
+        return 'failed';
     }
 
     $permHandler = xoops_getHandler('groupperm');
-    if (! \is_object($permHandler) || ! \method_exists($permHandler, 'addRight')) {
-        return false;
+
+    // getCount() is guarded as well as addRight(). Both are called below, xoops_getHandler()
+    // is declared as returning mixed, and checking only the one you happen to think of
+    // first is how this passed review and failed static analysis.
+    if (! \is_object($permHandler)
+        || ! \method_exists($permHandler, 'getCount')
+        || ! \method_exists($permHandler, 'addRight')) {
+        return 'failed';
     }
 
     $criteria = new \CriteriaCompo(new \Criteria('gperm_modid', (string) $mid));
     $criteria->add(new \Criteria('gperm_name', 'use_xwhoops'));
     if ((int) $permHandler->getCount($criteria) > 0) {
-        return false;
+        return 'exists';
     }
 
     $adminGroup = \defined('XOOPS_GROUP_ADMIN') ? (int) \constant('XOOPS_GROUP_ADMIN') : 1;
 
-    return (bool) $permHandler->addRight('use_xwhoops', 0, $adminGroup, $mid);
+    return $permHandler->addRight('use_xwhoops', 0, $adminGroup, $mid) ? 'created' : 'failed';
 }
 
 /**
@@ -94,24 +105,18 @@ function xoops_module_install_xwhoops(\XoopsModule $module): bool
     // BEFORE the seam guard below, not after. The permission gates the pre-seam
     // registration path too, so a 2.7.0-2.7.2 install needs it just as much -- and that
     // guard returns early.
-    $seeded = xwhoops_seedUsePermission($module);
-
-    if (! \function_exists('xoops_recordErrorScreenOwner')) {
-        if (! $seeded) {
-            $module->setMessage(
-                'NOTE: could not grant the use_xwhoops permission automatically. '
-                . 'Grant it at Admin → xWhoops → Permissions, or Whoops will stay dormant.'
-            );
-        }
-
-        return true;
-    }
-
-    if (! $seeded) {
+    //
+    // Only 'failed' is worth a message. 'exists' means a reinstall found the permission
+    // still configured from last time, which is the desired outcome and not news.
+    if ('failed' === xwhoops_seedUsePermission($module)) {
         $module->setMessage(
             'NOTE: could not grant the use_xwhoops permission automatically. '
             . 'Grant it at Admin → xWhoops → Permissions, or Whoops will stay dormant.'
         );
+    }
+
+    if (! \function_exists('xoops_recordErrorScreenOwner')) {
+        return true;
     }
 
     $dirname = (string) $module->getVar('dirname', 'n');
@@ -173,8 +178,14 @@ function xoops_module_update_xwhoops(\XoopsModule $module): bool
     // looking at 'disabled' ever since. Safe to run on every update: it creates a row only
     // when the permission has NO rows at all, so an administrator who revoked it keeps
     // their decision.
-    if (xwhoops_seedUsePermission($module)) {
+    $seeded = xwhoops_seedUsePermission($module);
+    if ('created' === $seeded) {
         $module->setMessage('Granted the use_xwhoops permission to the webmaster group.');
+    } elseif ('failed' === $seeded) {
+        $module->setMessage(
+            'NOTE: could not grant the use_xwhoops permission automatically. '
+            . 'Grant it at Admin → xWhoops → Permissions, or Whoops will stay dormant.'
+        );
     }
 
     if (! \function_exists('xoops_recordErrorScreenOwner')) {
